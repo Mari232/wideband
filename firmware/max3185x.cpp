@@ -7,30 +7,28 @@
 
 #include "max3185x.h"
 
-#if (EGT_CHANNELS > 0)
+#if (EGT_CHANNELS == 1)
 
-switch (EGT_CHANNELS)
-{
-case 1:
-{
-	static SPIConfig spi_config[1] =
-		{
-			{.circular = false,
-			 .end_cb = NULL,
-			 .ssport = EGT_CS0_PORT,
-			 .sspad = EGT_CS0_PIN,
-			 .cr1 =
-				 /* SPI_CR1_LSBFIRST | */
-			 ((3 << SPI_CR1_BR_Pos) & SPI_CR1_BR) | /* div = 16 */
-			 /* SPI_CR1_CPOL | */					// = 0
-			 SPI_CR1_CPHA |							// = 1
-			 0,
-			 .cr2 = 0},
-	}
-}
+static SPIConfig spi_config[1] =
+	{
+		{.circular = false,
+		 .end_cb = NULL,
+		 .ssport = EGT_CS0_PORT,
+		 .sspad = EGT_CS0_PIN,
+		 .cr1 =
+			 /* SPI_CR1_LSBFIRST | */
+		 ((3 << SPI_CR1_BR_Pos) & SPI_CR1_BR) | /* div = 16 */
+		 /* SPI_CR1_CPOL | */					// = 0
+		 SPI_CR1_CPHA |							// = 1
+		 0,
+		 .cr2 = 0}}; 
 
-case 2:
-{
+static Max3185x instances[] = {&spi_config[0]};
+#endif
+
+#if (EGT_CHANNELS > 1)
+
+
 	static SPIConfig spi_config[2] =
 		{
 			{.circular = false,
@@ -55,9 +53,12 @@ case 2:
 			 SPI_CR1_CPHA |							// = 1
 			 0,
 			 .cr2 = 0}};
-}
-}
+
+
 static Max3185x instances[] = {&spi_config[0], &spi_config[1]};
+#endif
+
+#if (EGT_CHANNELS > 0)
 
 static Max3185xThread EgtThread(instances);
 
