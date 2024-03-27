@@ -42,7 +42,7 @@
 /*
  * MCU type, supported types are defined in ./os/hal/platforms/hal_lld.h.
  */
-#define STM32F103xE
+#define STM32F103xB
 
 /*
  * IO pins assignments.
@@ -109,8 +109,8 @@
  * PB12 - Nernsr_4.2_esr_drive      (digital input, no pull) - keep high-Z after power on
  * PB13..PB15 - unused
  */
-#define VAL_GPIOBCRL            0x8B888200      /*  PB7...PB0 */
-#define VAL_GPIOBCRH            0x88843488      /* PB15...PB8 */
+#define VAL_GPIOBCRL            0x8AB8B200      /*  PB7...PB0 */
+#define VAL_GPIOBCRH            0xAA843488      /* PB15...PB8 */
 #define VAL_GPIOBODR            0x0000FFFF
 
 /*
@@ -125,7 +125,7 @@
  * PC15 - not used                  (digital input, pull-up)
  */
 #define VAL_GPIOCCRL            0x88888888      /*  PC7...PC0 */
-#define VAL_GPIOCCRH            0x84444428      /* PC15...PC8 */
+#define VAL_GPIOCCRH            0x24444428      /* PC15...PC8 */
 #define VAL_GPIOCODR            0x0000FFFF
 
 /*
