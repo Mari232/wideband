@@ -33,7 +33,7 @@
 #define VM_INPUT_DIVIDER (10.0 / (10.0 + 100.0))
 
 #define AFR_CHANNELS 1
-#define EGT_CHANNELS 1
+//#define EGT_CHANNELS 1
 
 // *******************************
 //    Nernst voltage & ESR sense
