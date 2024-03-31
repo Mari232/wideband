@@ -4,7 +4,7 @@
 #
 
 ifeq ($(BOARD),)
-  BOARD = f0_module
+  BOARD = f1_Mari232
 endif
 
 BOARDDIR = boards/$(BOARD)

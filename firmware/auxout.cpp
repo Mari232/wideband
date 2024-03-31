@@ -56,27 +56,25 @@ static void auxDacFillPwmConfig(void)
 
 static Pwm auxDac(AUXOUT_DAC_PWM_DEVICE);
 
-static const uint8_t auxOutPwmCh[AFR_CHANNELS] = {
+static const uint8_t auxOutPwmCh[AFR_CHANNELS+1] = {
     AUXOUT_DAC_PWM_CHANNEL_0,
-#if (AFR_CHANNELS > 1)
-    AUXOUT_DAC_PWM_CHANNEL_1,
-#endif
+    AUXOUT_DAC_PWM_CHANNEL_1
 };
 
-static const int8_t auxOutPwmChN[AFR_CHANNELS] = {
-#ifdef AUXOUT_DAC_PWM_CHANNEL_0_NC
-    AUXOUT_DAC_PWM_CHANNEL_0_NC,
-#else
-    -1,
-#endif
-#if (AFR_CHANNELS > 1)
-#ifdef AUXOUT_DAC_PWM_CHANNEL_1_NC
-    AUXOUT_DAC_PWM_CHANNEL_1_NC,
-#else
-    -1,
-#endif
-#endif
-};
+//static const int8_t auxOutPwmChN[AFR_CHANNELS] = {
+//#ifdef AUXOUT_DAC_PWM_CHANNEL_0_NC
+//    AUXOUT_DAC_PWM_CHANNEL_0_NC,
+//#else
+//    -1,
+//#endif
+//#if (AFR_CHANNELS > 1)
+//#ifdef AUXOUT_DAC_PWM_CHANNEL_1_NC
+//    AUXOUT_DAC_PWM_CHANNEL_1_NC,
+//#else
+//    -1,
+//#endif
+//#endif
+//};
 
 void SetAuxDac(int channel, float voltage)
 {
@@ -86,9 +84,9 @@ void SetAuxDac(int channel, float voltage)
 
     auxDac.SetDuty(auxOutPwmCh[channel], duty);
     // Ripple cancelation channel
-    if (auxOutPwmChN[channel >= 0]) {
-        auxDac.SetDuty(auxOutPwmChN[channel], duty);
-    }
+    //if (auxOutPwmChN[channel >= 0]) {
+    //    auxDac.SetDuty(auxOutPwmChN[channel], duty);
+    //}
 }
 
 #endif
