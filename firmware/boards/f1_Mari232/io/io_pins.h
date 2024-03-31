@@ -8,9 +8,9 @@
 #define LED_GREEN_PIN 9
 
 // Communication - UART
-#define SERIAL_GPIO_PORT				GPIOA
-#define LL_UART_TX_PIN				9
-#define LL_UART_RX_PIN				10
+#define UART_GPIO_PORT				GPIOA
+#define LL_UART_TX_PIN				LL_GPIO_PIN_9
+#define LL_UART_RX_PIN				LL_GPIO_PIN_10
 
 // Communication - CAN1
 #define CAN_GPIO_PORT				GPIOA
