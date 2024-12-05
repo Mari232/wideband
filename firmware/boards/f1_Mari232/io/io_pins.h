@@ -41,11 +41,11 @@
 #define PUMP_DAC_PWM_CHANNEL_0 1
 
 // TIM1 - DAC for AUX outputs
-#define AUXOUT_DAC_PWM_DEVICE       PWMD1
+//#define AUXOUT_DAC_PWM_DEVICE       PWMD1
 // PB14 - TIM1_CH2N
-#define AUXOUT_DAC_PWM_CHANNEL_0    1
+//#define AUXOUT_DAC_PWM_CHANNEL_0_NC    1
 // PB15 - TIM1_CH3N
-#define AUXOUT_DAC_PWM_CHANNEL_1    2
+//#define AUXOUT_DAC_PWM_CHANNEL_1_NC    2
 
 
 #define ID_SEL1_PORT                GPIOC

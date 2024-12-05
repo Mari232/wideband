@@ -33,7 +33,7 @@
 #define VM_INPUT_DIVIDER (10.0 / (10.0 + 100.0))
 
 #define AFR_CHANNELS 1
-//#define EGT_CHANNELS 1
+#define EGT_CHANNELS 1
 
 // *******************************
 //    Nernst voltage & ESR sense
@@ -51,6 +51,7 @@
 // *******************************
 #define TS_PRIMARY_SERIAL_PORT	SD1
 #define TS_PRIMARY_BAUDRATE		115200
+
 
 // *******************************
 //   MAX31855 spi port
