@@ -37,7 +37,7 @@ private:
     float nernstDc = 0;
     float pumpCurrentSenseVoltage = 0;
 
-#ifdef BATTERY_INPUT_DIVIDER
+#ifdef BOARD_HAS_VOLTAGE_SENSE
     float internalHeaterVoltage = 0;
 #endif
 
@@ -46,5 +46,11 @@ private:
 
 // Get the sampler for a particular channel
 const ISampler& GetSampler(int ch);
+
+#ifdef BOARD_HAS_VOLTAGE_SENSE
+float GetSupplyVoltage();
+#endif
+
+float GetMcuTemperature();
 
 void StartSampling();

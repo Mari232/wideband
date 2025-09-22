@@ -1,12 +1,21 @@
 #include "heater_control.h"
 
-#include "fault.h"
+#include "status.h"
 #include "sampling.h"
 
 using namespace wbo;
 
+static const PidConfig heaterPidConfig =
+{
+    .kP = 0.3f,      // kP
+    .kI = 0.3f,      // kI
+    .kD = 0.01f,     // kD
+    .clamp = 3.0f,      // Integrator clamp (volts)
+};
+
 HeaterControllerBase::HeaterControllerBase(int ch, int preheatTimeSec, int warmupTimeSec)
-    : ch(ch)
+    : m_pid(heaterPidConfig, HEATER_CONTROL_PERIOD)
+    , ch(ch)
     , m_preheatTimeSec(preheatTimeSec)
     , m_warmupTimeSec(warmupTimeSec)
 {
@@ -53,7 +62,6 @@ HeaterState HeaterControllerBase::GetNextState(HeaterState currentState, HeaterA
         if (heaterSupplyVoltage < HEATER_BATTETY_OFF_VOLTAGE)
         {
             m_batteryStableTimer.reset();
-            return HeaterState::NoHeaterSupply;
         }
         else if (heaterSupplyVoltage > HEATER_BATTERY_ON_VOLTAGE)
         {
@@ -66,6 +74,7 @@ HeaterState HeaterControllerBase::GetNextState(HeaterState currentState, HeaterA
     {
         // ECU hasn't allowed preheat yet, reset timer, and force preheat state
         m_preheatTimer.reset();
+        SetStatus(ch, Status::Preheat);
         return HeaterState::Preheat;
     }
 
@@ -84,6 +93,7 @@ HeaterState HeaterControllerBase::GetNextState(HeaterState currentState, HeaterA
                 // Reset the timer for the warmup phase
                 m_warmupTimer.reset();
 
+                SetStatus(ch, Status::Warmup);
                 return HeaterState::WarmupRamp;
             }
             #endif
@@ -98,6 +108,7 @@ HeaterState HeaterControllerBase::GetNextState(HeaterState currentState, HeaterA
                 // Reset the timer for the warmup phase
                 m_warmupTimer.reset();
 
+                SetStatus(ch, Status::Warmup);
                 return HeaterState::WarmupRamp;
             }
 
@@ -106,17 +117,20 @@ HeaterState HeaterControllerBase::GetNextState(HeaterState currentState, HeaterA
         case HeaterState::WarmupRamp:
             if (sensorTemp > closedLoopTemp)
             {
+                SetStatus(ch, Status::RunningClosedLoop);
                 return HeaterState::ClosedLoop;
             }
             else if (m_warmupTimer.hasElapsedSec(m_warmupTimeSec))
             {
-                SetFault(ch, Fault::SensorDidntHeat);
+                SetStatus(ch, Status::SensorDidntHeat);
                 return HeaterState::Stopped;
             }
 
             break;
         case HeaterState::ClosedLoop:
-            // Check that the sensor's ESR is acceptable for normal operation
+            // Over/under heat timers track how long it's been since
+            // temperature was within normal range (then we abort if
+            // it's been too long out of range)
             if (sensorTemp <= overheatTemp)
             {
                 m_overheatTimer.reset();
@@ -129,19 +143,17 @@ HeaterState HeaterControllerBase::GetNextState(HeaterState currentState, HeaterA
 
             if (m_overheatTimer.hasElapsedSec(0.5f))
             {
-                SetFault(ch, Fault::SensorOverheat);
+                SetStatus(ch, Status::SensorOverheat);
                 return HeaterState::Stopped;
             }
             else if (m_underheatTimer.hasElapsedSec(0.5f))
             {
-                SetFault(ch, Fault::SensorUnderheat);
+                SetStatus(ch, Status::SensorUnderheat);
                 return HeaterState::Stopped;
             }
 
             break;
         case HeaterState::Stopped:
-        case HeaterState::NoHeaterSupply:
-            /* nop */
             break;
     }
 
@@ -170,12 +182,9 @@ float HeaterControllerBase::GetVoltageForState(HeaterState state, float sensorEs
             // Negated because lower resistance -> hotter
 
             // TODO: heater PID should operate on temperature, not ESR
-            return 7.5f - heaterPid.GetOutput(m_targetEsr, sensorEsr);
+            return 7.5f - m_pid.GetOutput(m_targetEsr, sensorEsr);
         case HeaterState::Stopped:
             // Something has gone wrong, turn off the heater.
-            return 0;
-        case HeaterState::NoHeaterSupply:
-            // No/too low heater supply - disable output
             return 0;
     }
 
@@ -189,11 +198,15 @@ void HeaterControllerBase::Update(const ISampler& sampler, HeaterAllow heaterAll
     float sensorEsr = sampler.GetSensorInternalResistance();
     float sensorTemperature = sampler.GetSensorTemperature();
 
-    // If we haven't heard from the ECU, use the internally sensed
-    // battery voltage instead of voltage over CAN.
-    float heaterSupplyVoltage = heaterAllowState == HeaterAllow::Unknown
-                                ? sampler.GetInternalHeaterVoltage()
-                                : GetRemoteBatteryVoltage();
+    #ifdef BOARD_HAS_VOLTAGE_SENSE
+        float heaterSupplyVoltage = GetSupplyVoltage();
+    #else // not BOARD_HAS_VOLTAGE_SENSE
+        // If we haven't heard from the ECU, use the internally sensed
+        // battery voltage instead of voltage over CAN.
+        float heaterSupplyVoltage = heaterAllowState == HeaterAllow::Unknown
+                                    ? sampler.GetInternalHeaterVoltage()
+                                    : GetRemoteBatteryVoltage();
+    #endif
 
     // Run the state machine
     heaterState = GetNextState(heaterState, heaterAllowState, heaterSupplyVoltage, sensorTemperature);
@@ -202,6 +215,11 @@ void HeaterControllerBase::Update(const ISampler& sampler, HeaterAllow heaterAll
     // Limit to 12 volts
     if (heaterVoltage > 12) {
         heaterVoltage = 12;
+    }
+
+    // Very low supply voltage -> avoid divide by zero or very high duty
+    if (heaterSupplyVoltage < 3) {
+        heaterSupplyVoltage = 12;
     }
 
     // duty = (V_eff / V_batt) ^ 2
@@ -218,6 +236,7 @@ void HeaterControllerBase::Update(const ISampler& sampler, HeaterAllow heaterAll
     }
     #endif
 
+    // Protect the sensor in case of very high voltage
     if (heaterSupplyVoltage >= 23)
     {
         duty = 0;
@@ -239,8 +258,6 @@ const char* describeHeaterState(HeaterState state)
             return "ClosedLoop";
         case HeaterState::Stopped:
             return "Stopped";
-        case HeaterState::NoHeaterSupply:
-            return "NoHeaterSupply";
     }
 
     return "Unknown";

@@ -1,31 +1,39 @@
-#include "can.h"
 #include "hal.h"
 
-#include "fault.h"
+#include "can.h"
+
+#include "status.h"
 #include "can_helper.h"
 #include "heater_control.h"
 #include "lambda_conversion.h"
 #include "sampling.h"
 #include "pump_dac.h"
 #include "port.h"
+#include "pump_control.h"
+
+#include <rusefi/math.h>
 
 // this same header is imported by rusEFI to get struct layouts and firmware version
 #include "../for_rusefi/wideband_can.h"
 
 static Configuration* configuration;
 
-static THD_WORKING_AREA(waCanTxThread, 256);
+static THD_WORKING_AREA(waCanTxThread, 512);
 void CanTxThread(void*)
 {
     chRegSetThreadName("CAN Tx");
 
+    // Current system time.
+    systime_t prev = chVTGetSystemTime();
+
     while(1)
     {
-        for (int ch = 0; ch < AFR_CHANNELS; ch++) {
+        for (int ch = 0; ch < AFR_CHANNELS; ch++)
+        {
             SendCanForChannel(ch);
         }
 
-        chThdSleepMilliseconds(WBO_TX_PERIOD_MS);
+        prev = chThdSleepUntilWindowed(prev, chTimeAddX(prev, TIME_MS2I(WBO_TX_PERIOD_MS)));
     }
 }
 
@@ -33,9 +41,14 @@ static void SendAck()
 {
     CANTxFrame frame;
 
-    frame.IDE = CAN_IDE_EXT;
-    frame.EID = WB_ACK;
+#ifdef STM32G4XX
+    frame.common.RTR = 0;
+#else // Not CAN FD
     frame.RTR = CAN_RTR_DATA;
+#endif
+
+    CAN_EXT(frame) = 1;
+    CAN_EID(frame) = WB_ACK;
     frame.DLC = 0;
 
     canTransmitTimeout(&CAND1, CAN_ANY_MAILBOX, &frame, TIME_INFINITE);
@@ -63,13 +76,17 @@ void CanRxThread(void*)
         }
 
         // Ignore std frames, only listen to ext
-        if (frame.IDE != CAN_IDE_EXT)
+        if (!CAN_EXT(frame))
         {
             continue;
         }
 
-        if (frame.DLC == 2 && frame.EID == WB_MGS_ECU_STATUS) {
-            // This is status from ECU - battery voltage and heater enable signal
+        if (frame.DLC >= 2 && CAN_ID(frame) == WB_MGS_ECU_STATUS)
+        {
+            // This is status from ECU
+            // - battery voltage
+            // - heater enable signal
+            // - optionally pump control gain
 
             // data1 contains heater enable bit
             if ((frame.data8[1] & 0x1) == 0x1)
@@ -92,9 +109,15 @@ void CanRxThread(void*)
             {
                 remoteBatteryVoltage = vbatt;
             }
+
+            if (frame.DLC >= 3) {
+                // data2 contains heater gain in percent (0-200)
+                float pumpGain = frame.data8[1] * 0.01f;
+                SetPumpGainAdjust(clampF(0, pumpGain, 1));
+            }
         }
         // If it's a bootloader entry request, reboot to the bootloader!
-        else if ((frame.DLC == 0 || frame.DLC == 1) && frame.EID == WB_BL_ENTER)
+        else if ((frame.DLC == 0 || frame.DLC == 1) && CAN_ID(frame) == WB_BL_ENTER)
         {
             // If 0xFF (force update all) or our ID, reset to bootloader, otherwise ignore
             if (frame.DLC == 0 || frame.data8[0] == 0xFF || frame.data8[0] == GetConfiguration()->CanIndexOffset)
@@ -108,7 +131,7 @@ void CanRxThread(void*)
             }
         }
         // Check if it's an "index set" message
-        else if (frame.DLC == 1 && frame.EID == WB_MSG_SET_INDEX)
+        else if (frame.DLC == 1 && CAN_ID(frame) == WB_MSG_SET_INDEX)
         {
             configuration = GetConfiguration();
             configuration->CanIndexOffset = frame.data8[0];
@@ -176,7 +199,7 @@ void SendRusefiFormat(uint8_t ch)
         frame.get().Esr = sampler.GetSensorInternalResistance();
         frame.get().NernstDc = nernstDc * 1000;
         frame.get().PumpDuty = pumpDuty * 255;
-        frame.get().Status = GetCurrentFault(ch);
+        frame.get().status = GetCurrentStatus(ch);
         frame.get().HeaterDuty = GetHeaterDuty(ch) * 255;
     }
 }

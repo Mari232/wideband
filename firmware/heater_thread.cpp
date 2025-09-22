@@ -52,11 +52,11 @@ HeaterController heaterControllers[AFR_CHANNELS] =
 #endif
 
 #if AFR_CHANNELS >= 3
-    { 1, HEATER_PWM_CHANNEL_2 },
+    { 2, HEATER_PWM_CHANNEL_2 },
 #endif
 
 #if AFR_CHANNELS >= 4
-    { 1, HEATER_PWM_CHANNEL_3 },
+    { 3, HEATER_PWM_CHANNEL_3 },
 #endif
 };
 
@@ -68,8 +68,6 @@ const IHeaterController& GetHeaterController(int ch)
 static THD_WORKING_AREA(waHeaterThread, 256);
 static void HeaterThread(void*)
 {
-    int i;
-
     chRegSetThreadName("Heater");
 
     // Wait for temperature sensing to stabilize so we don't
@@ -77,9 +75,11 @@ static void HeaterThread(void*)
     chThdSleepMilliseconds(1000);
 
     // Configure heater controllers for sensor type
-    for (i = 0; i < AFR_CHANNELS; i++) {
+    for (int i = 0; i < AFR_CHANNELS; i++)
+    {
         auto& h = heaterControllers[i];
-        switch (GetSensorType()) {
+        switch (GetSensorType())
+        {
             case SensorType::LSU42:
                 h.Configure(730, 80);
                 break;
@@ -97,7 +97,8 @@ static void HeaterThread(void*)
     {
         auto heaterAllowState = GetHeaterAllowed();
 
-        for (i = 0; i < AFR_CHANNELS; i++) {
+        for (int i = 0; i < AFR_CHANNELS; i++)
+        {
             const auto& sampler = GetSampler(i);
             auto& heater = heaterControllers[i];
 
@@ -112,10 +113,11 @@ static void HeaterThread(void*)
 void StartHeaterControl()
 {
     heaterPwm.Start(heaterPwmConfig);
-    heaterPwm.SetDuty(heaterControllers[0].pwm_ch, 0);
-#if (AFR_CHANNELS > 1)
-    heaterPwm.SetDuty(heaterControllers[1].pwm_ch, 0);
-#endif
+
+    for (int i = 0; i < AFR_CHANNELS; i++)
+    {
+        heaterPwm.SetDuty(heaterControllers[i].pwm_ch, 0);
+    }
 
     chThdCreateStatic(waHeaterThread, sizeof(waHeaterThread), NORMALPRIO + 1, HeaterThread, nullptr);
 }

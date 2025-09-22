@@ -11,15 +11,16 @@
 
 // 48MHz / 1024 = 46.8khz PWM
 // 64MHz / 1024 = 62.5khz PWM
+// 160MHz / 1024 = 156.25khz PWM
 static const PWMConfig pumpDacConfig = {
     STM32_SYSCLK,
     1024,
     nullptr,
     {
-        {PWM_OUTPUT_ACTIVE_HIGH, nullptr},
-        {PWM_OUTPUT_ACTIVE_HIGH, nullptr},
-        {PWM_OUTPUT_ACTIVE_HIGH, nullptr},
-        {PWM_OUTPUT_ACTIVE_HIGH, nullptr}
+        {PWM_OUTPUT_ACTIVE_HIGH | PWM_COMPLEMENTARY_OUTPUT_ACTIVE_LOW, nullptr},
+        {PWM_OUTPUT_ACTIVE_HIGH | PWM_COMPLEMENTARY_OUTPUT_ACTIVE_LOW, nullptr},
+        {PWM_OUTPUT_ACTIVE_HIGH | PWM_COMPLEMENTARY_OUTPUT_ACTIVE_LOW, nullptr},
+        {PWM_OUTPUT_ACTIVE_HIGH | PWM_COMPLEMENTARY_OUTPUT_ACTIVE_LOW, nullptr}
     },
     0,
     0,
@@ -99,13 +100,7 @@ void InitPumpDac()
 
 void SetPumpCurrentTarget(int ch, int32_t microampere)
 {
-#ifndef START_PUMP_TEMP_OFFSET
-    // Don't allow pump current when the sensor isn't hot
-    if (!GetHeaterController(ch).IsRunningClosedLoop())
-    {
-        microampere = 0;
-    }
-#endif
+    // microampere = 2000;
 
     state[ch].curIpump = microampere;
 

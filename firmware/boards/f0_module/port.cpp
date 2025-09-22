@@ -3,17 +3,32 @@
 
 #include "wideband_config.h"
 
+#include "ch.hpp"
 #include "hal.h"
 
 #define ADC_CHANNEL_COUNT 3
 
+void PortPrepareAnalogSampling()
+{
+    adcStart(&ADCD1, nullptr);
+}
+
 static adcsample_t adcBuffer[ADC_CHANNEL_COUNT * ADC_OVERSAMPLE];
+
+static chibios_rt::BinarySemaphore adcDoneSemaphore(/* taken =*/ true);
+
+static void adcDoneCallback(ADCDriver*)
+{
+    chSysLockFromISR();
+    adcDoneSemaphore.signalI();
+    chSysUnlockFromISR();
+}
 
 const ADCConversionGroup convGroup =
 {
     false,
     ADC_CHANNEL_COUNT,
-    nullptr,
+    adcDoneCallback,
     nullptr,
     ADC_CFGR1_CONT | ADC_CFGR1_RES_12BIT,                  // CFGR1
     ADC_TR(0, 0),       // TR
@@ -36,9 +51,14 @@ static float AverageSamples(adcsample_t* buffer, size_t idx)
     return (float)sum * scale;
 }
 
-AnalogResult AnalogSample()
+void AnalogSampleStart()
 {
-    adcConvert(&ADCD1, &convGroup, adcBuffer, ADC_OVERSAMPLE);
+    adcStartConversion(&ADCD1, &convGroup, adcBuffer, ADC_OVERSAMPLE);
+}
+
+AnalogResult AnalogSampleFinish()
+{
+    adcDoneSemaphore.wait(TIME_INFINITE);
 
     return
     {
@@ -51,6 +71,9 @@ AnalogResult AnalogSample()
             },
         },
         .VirtualGroundVoltageInt = AverageSamples(adcBuffer, 2),
+
+        // TODO!
+        .McuTemp = 0,
     };
 }
 
