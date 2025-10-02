@@ -81,7 +81,7 @@ void CanRxThread(void*)
             continue;
         }
 
-        if (frame.DLC >= 2 && CAN_ID(frame) == WB_MGS_ECU_STATUS)
+        if (frame.DLC >= 2 && CAN_ID(frame) == WB_MSG_ECU_STATUS)
         {
             // This is status from ECU
             // - battery voltage
@@ -111,7 +111,7 @@ void CanRxThread(void*)
             }
 
             if (frame.DLC >= 3) {
-                // data2 contains heater gain in percent (0-200)
+                // data2 contains pump controller gain in percent (0-200)
                 float pumpGain = frame.data8[1] * 0.01f;
                 SetPumpGainAdjust(clampF(0, pumpGain, 1));
             }
